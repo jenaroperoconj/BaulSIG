@@ -1,4 +1,7 @@
 from gui.login import iniciar_login
 
-if __name__ == "__main__":
+def main():
     iniciar_login()
+
+if __name__ == "__main__":
+    main()

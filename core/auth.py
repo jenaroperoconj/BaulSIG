@@ -1,7 +1,5 @@
 from tkinter import messagebox
 from db.conexion import conectar
-from gui.admin import abrir_menu_admin
-from gui.usuario import abrir_menu_usuario
 
 def verificar_login(usuario, contrasena, ventana_login, modo_oscuro):
     conn = conectar()
@@ -21,9 +19,13 @@ def verificar_login(usuario, contrasena, ventana_login, modo_oscuro):
     if resultado:
         user_id, rol = resultado
         ventana_login.destroy()
+
+        # ⛔️ Importaciones internas para evitar el ciclo
         if rol == 'admin':
+            from gui.admin import abrir_menu_admin
             abrir_menu_admin(user_id, modo_oscuro)
         else:
+            from gui.usuario import abrir_menu_usuario
             abrir_menu_usuario(user_id, usuario, modo_oscuro)
     else:
         messagebox.showerror("Acceso denegado", "Usuario o contraseña incorrectos.")

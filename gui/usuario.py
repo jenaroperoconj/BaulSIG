@@ -96,10 +96,61 @@ def descargar_con_motivo(user_id, lista):
         messagebox.showwarning("Atención", "Debes seleccionar un archivo.")
         return
     nombre_archivo = lista.get(seleccion[0]).split(" - ")[0]
-    motivo = simpledialog.askstring("Motivo", "¿Por qué deseas descargar este archivo?")
-    if not motivo:
-        messagebox.showinfo("Cancelado", "Debes ingresar un motivo.")
-        return
+
+    # Crear ventana para seleccionar motivo
+    ventana_motivo = tk.Toplevel()
+    ventana_motivo.title("Seleccionar motivo")
+    centrar_ventana(ventana_motivo, 400, 200)
+    ventana_motivo.grab_set()
+
+    tk.Label(ventana_motivo, text="Selecciona un motivo:", font=("Arial", 12)).pack(pady=10)
+    motivo_var = tk.StringVar(value="Solicitud")
+    motivos = ["Solicitud", "Trabajo interno", "Modificación de datos", "Otro motivo"]
+    tk.OptionMenu(ventana_motivo, motivo_var, *motivos).pack(pady=5)
+
+    motivo_frame = tk.Frame(ventana_motivo)
+    motivo_frame.pack(pady=10)
+
+    def on_motivo_change(*args):
+        for widget in motivo_frame.winfo_children():
+            widget.destroy()
+        if motivo_var.get() == "Solicitud":
+            tk.Label(motivo_frame, text="N° de Solicitud:", font=("Arial", 10)).pack(side="left")
+            solicitud_entry = tk.Entry(motivo_frame)
+            solicitud_entry.pack(side="left")
+            motivo_frame.solicitud_entry = solicitud_entry
+        elif motivo_var.get() == "Otro motivo":
+            tk.Label(motivo_frame, text="Describe el motivo:", font=("Arial", 10)).pack(side="left")
+            otro_motivo_entry = tk.Entry(motivo_frame)
+            otro_motivo_entry.pack(side="left")
+            motivo_frame.otro_motivo_entry = otro_motivo_entry
+
+    motivo_var.trace("w", on_motivo_change)
+    on_motivo_change()
+
+    def confirmar_motivo():
+        motivo_seleccionado = motivo_var.get()
+        if motivo_seleccionado == "Solicitud":
+            numero_solicitud = getattr(motivo_frame, "solicitud_entry", None)
+            if not numero_solicitud or not numero_solicitud.get().isdigit():
+                messagebox.showinfo("Cancelado", "Debes ingresar un número de solicitud válido.")
+                return
+            motivo = f"Solicitud N° {numero_solicitud.get()}"
+        elif motivo_seleccionado == "Otro motivo":
+            otro_motivo = getattr(motivo_frame, "otro_motivo_entry", None)
+            if not otro_motivo or not otro_motivo.get():
+                messagebox.showinfo("Cancelado", "Debes ingresar un motivo.")
+                return
+            motivo = otro_motivo.get()
+        else:
+            motivo = motivo_seleccionado
+
+        ventana_motivo.destroy()
+        realizar_descarga(user_id, nombre_archivo, motivo)
+
+    tk.Button(ventana_motivo, text="Confirmar", command=confirmar_motivo).pack(pady=10)
+
+def realizar_descarga(user_id, nombre_archivo, motivo):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute("SELECT id, ruta FROM archivos WHERE nombre_archivo = %s", (nombre_archivo,))
