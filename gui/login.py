@@ -12,7 +12,7 @@ def iniciar_login(modo=None):
 
     ventana = tk.Tk()
     ventana.title("Inicio de Sesión")
-    centrar_ventana(ventana, 400, 350)
+    centrar_ventana(ventana, 900, 400)
     ventana.configure(bg=colores[tema]["bg"])
 
     # Botón para cambiar tema
@@ -41,7 +41,7 @@ def iniciar_login(modo=None):
     tk.Label(frame, text="Contraseña:", bg=colores[tema]["bg"], fg=colores[tema]["fg"]).pack()
     entry_contrasena = tk.Entry(frame, show="*", font=("Arial", 11), width=30, bg=colores[tema]["entry_bg"], fg=colores[tema]["entry_fg"])
     entry_contrasena.pack(pady=5)
-
+    ventana.bind("<Return>", lambda event: verificar_login(entry_usuario.get(), entry_contrasena.get(), ventana, modo_oscuro))
     # Botón de ingresar
     tk.Button(
         frame,
