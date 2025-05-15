@@ -191,7 +191,6 @@ class ExploradorAdmin:
             self.tabla.column(col, anchor="w")
         self.tabla.pack(fill="both", expand=True, padx=10, pady=10)
 
-
         self.arbol.bind("<<TreeviewSelect>>", self._al_seleccionar_carpeta)
         self.tabla.bind("<Double-1>", self._abrir_item_tabla)
         self.arbol.bind("<Button-3>", self._menu_contexto_arbol)

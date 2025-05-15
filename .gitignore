@@ -1,2 +1,1 @@
-gui/__pycache__/admin.cpython-313.pyc
-gui/__pycache__/login.cpython-313.pyc
+*.pyc
