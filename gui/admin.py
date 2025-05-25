@@ -7,6 +7,8 @@ from tkinter import ttk, filedialog, simpledialog, messagebox
 from db.archivos import registrar_archivo, registrar_log, _buscar_archivo_id, actualizar_nombre_archivo, actualizar_ruta_archivo
 from gui.login import iniciar_login
 from tkinterdnd2 import DND_FILES, TkinterDnD
+from core.utils import centrar_ventana
+from core.config import ARCHIVOS_COMPARTIDOS_DIR
 
 class ExploradorAdmin:
     def __init__(self, master, modo_oscuro=False, es_admin=True, user_id=None):
@@ -15,14 +17,13 @@ class ExploradorAdmin:
         self.orden_columna = None
         self.orden_descendente = False
         self.master = master
+        self.BASE_DIR = Path(ARCHIVOS_COMPARTIDOS_DIR)
         self.modo_oscuro = modo_oscuro
         self.master.title("Explorador de Archivos - Administrador")
-        self.master.geometry("1200x700")
-        self.master.configure(bg="#1e1e1e")
+        self.master.configure(bg="#f0f0f0")
 
         self.historial = []
         self.historial_pos = -1
-        self.BASE_DIR = Path("uploads")
         self.ruta_actual = self.BASE_DIR
 
         if not self.BASE_DIR.exists():
@@ -47,7 +48,7 @@ class ExploradorAdmin:
         import psycopg2
         ventana = tk.Toplevel(self.master)
         ventana.title("Solicitudes de Descarga")
-        ventana.geometry("1350x520")
+        centrar_ventana(ventana, 1350, 520)
 
         tabla = ttk.Treeview(ventana, columns=("Usuario", "Archivo", "Estado", "Motivo", "Fecha solicitud"), show="headings")
         for col in tabla["columns"]:
@@ -69,7 +70,9 @@ class ExploradorAdmin:
             for row in tabla.get_children():
                 tabla.delete(row)
             for fila in resultados:
-                tabla.insert("", "end", iid=fila[0], values=fila[1:])
+                fecha = fila[5].strftime("%d/%m/%Y %H:%M") if fila[5] else ""
+                valores = (fila[1], fila[2], fila[3], fila[4], fecha)
+                tabla.insert("", "end", iid=fila[0], values=valores)
 
         def aprobar():
             item_id = tabla.focus()
@@ -85,7 +88,9 @@ class ExploradorAdmin:
             conn.commit()
             conn.close()
             cargar()
-            messagebox.showinfo("Aprobada", "La solicitud fue aprobada.")
+            messagebox.showinfo("Aprobada", "La solicitud fue aprobada.", parent=ventana)
+            ventana.lift()
+            ventana.focus_force()
 
         def rechazar():
             item_id = tabla.focus()
@@ -101,12 +106,14 @@ class ExploradorAdmin:
             conn.commit()
             conn.close()
             cargar()
-            messagebox.showinfo("Rechazada", "La solicitud fue rechazada.")
+            messagebox.showinfo("Rechazada", "La solicitud fue rechazada.", parent=ventana)
+            ventana.lift()
+            ventana.focus_force()
 
         btn_frame = tk.Frame(ventana)
         btn_frame.pack(pady=5)
-        tk.Button(btn_frame, text="✅ Aprobar", command=aprobar, bg="#4CAF50", fg="white").pack(side="left", padx=5)
-        tk.Button(btn_frame, text="❌ Rechazar", command=rechazar, bg="#F44336", fg="white").pack(side="left", padx=5)
+        tk.Button(btn_frame, text="✅ Aprobar", command=aprobar, bg="#4CAF50", fg="#000000").pack(side="left", padx=5)
+        tk.Button(btn_frame, text="❌ Rechazar", command=rechazar, bg="#F44336", fg="#000000").pack(side="left", padx=5)
 
         def ver_historial():
             item_id = tabla.focus()
@@ -115,43 +122,64 @@ class ExploradorAdmin:
                 return
 
             ventana_historial = tk.Toplevel(ventana)
-            ventana_historial.title("Historial de motivos")
-            ventana_historial.geometry("600x300")
+            ventana_historial.title("Historial completo de motivos")
+            centrar_ventana(ventana_historial, 650, 350)
 
             tabla_hist = ttk.Treeview(ventana_historial, columns=("Fecha", "Motivo"), show="headings")
             tabla_hist.heading("Fecha", text="Fecha")
             tabla_hist.heading("Motivo", text="Motivo")
             tabla_hist.pack(fill="both", expand=True, padx=10, pady=10)
 
-            conn = psycopg2.connect(dbname="sistema_archivos", user="postgres", password="sig2025", host="localhost", port="5433")
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT fecha, motivo
-                FROM historial_motivos
-                WHERE solicitud_id = %s
-                ORDER BY fecha DESC
-            """, (item_id,))
-            filas = cur.fetchall()
-            conn.close()
+            try:
+                conn = psycopg2.connect(
+                    dbname="sistema_archivos",
+                    user="postgres",
+                    password="sig2025",
+                    host="localhost",
+                    port="5433"
+                )
+                cur = conn.cursor()
 
-            for fila in filas:
-                tabla_hist.insert("", "end", values=(fila[0].strftime("%d/%m/%Y %H:%M"), fila[1]))
+                cur.execute("""
+                    SELECT solicitud_id, motivo, fecha
+                    FROM historial_motivos
+                    WHERE solicitud_id = %s
 
-        tk.Button(btn_frame, text="📜 Ver historial", command=ver_historial, bg="#2196F3", fg="white").pack(side="left", padx=5)
+                    UNION ALL
+
+                    SELECT id AS solicitud_id, motivo, fecha_solicitud AS fecha
+                    FROM solicitudes_descarga
+                    WHERE id = %s
+
+                    ORDER BY fecha;
+                """, (item_id, item_id))
+
+                filas = cur.fetchall()
+                conn.close()
+
+                for fila in filas:
+                    fecha = fila[2].strftime("%d/%m/%Y %H:%M") if fila[2] else "-"
+                    motivo = fila[1]
+                    tabla_hist.insert("", "end", values=(fecha, motivo))
+
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo cargar el historial:\n{str(e)}")
+
+        tk.Button(btn_frame, text="📜 Ver historial", command=ver_historial, bg="#2196F3", fg="#000000").pack(side="left", padx=5)
 
         cargar()
     
     def _crear_widgets(self):
-        barra_sup = tk.Frame(self.master, bg="#333333", padx=12, pady=10, bd=2, relief="groove")
+        barra_sup = tk.Frame(self.master, bg="#dddddd", padx=12, pady=10, bd=2, relief="groove")
         tk.Button(barra_sup, text="📥 Ver solicitudes", command=self._mostrar_popup_solicitudes).pack(side="left", padx=5)
-        panel_derecho = tk.Frame(barra_sup, bg="#333333")
+        panel_derecho = tk.Frame(barra_sup, bg="#dddddd")
         panel_derecho.pack(side="right")
 
         btn_logout = tk.Button(panel_derecho, text="🔒 Cerrar sesión", command=self._cerrar_sesion,
-                            bg="#aa3333", fg="white", font=("Segoe UI", 9, "bold"))
+                            bg="#aa3333", fg="#000000", font=("Segoe UI", 9, "bold"))
         btn_logout.pack(side="right", padx=(5, 0))
 
-        label_lupa = tk.Label(panel_derecho, text="🔍", bg="#333333", fg="white", font=("Segoe UI", 10))
+        label_lupa = tk.Label(panel_derecho, text="🔍", bg="#dddddd", fg="#000000", font=("Segoe UI", 10))
         label_lupa.pack(side="left", padx=(0, 0), pady=2)
 
         self.entrada_busqueda = tk.Entry(panel_derecho, width=25)
@@ -165,23 +193,23 @@ class ExploradorAdmin:
         tk.Button(barra_sup, text="←", command=lambda: self._navegar_historial(-1)).pack(side="left")
         tk.Button(barra_sup, text="→", command=lambda: self._navegar_historial(1)).pack(side="left")
 
-        self.ruta_label = tk.Frame(barra_sup, bg="#2d2d2d")
+        self.ruta_label = tk.Frame(barra_sup, bg="#e8e8e8")
         self.ruta_label.pack(side="left", padx=10)
 
         contenedor = tk.Frame(self.master)
         contenedor.pack(fill="both", expand=True)
 
-        self.panel_izq = tk.Frame(contenedor, width=300, bg="#1e1e1e")
+        self.panel_izq = tk.Frame(contenedor, width=300, bg="#f0f0f0")
         self.panel_izq.pack(side="left", fill="y")
 
         # Encabezado para el árbol
-        tk.Label(self.panel_izq, text="📂 Directorio de Carpetas", bg="#1e1e1e", fg="#d4d4d4",
+        tk.Label(self.panel_izq, text="📂 Directorio de Carpetas", bg="#f0f0f0", fg="#222222",
                  font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", padx=5, pady=(5, 0))
 
         self.arbol = ttk.Treeview(self.panel_izq)
         self.arbol.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
-        self.panel_der = tk.Frame(contenedor, bg="#1e1e1e")
+        self.panel_der = tk.Frame(contenedor, bg="#f0f0f0")
         self.panel_der.pack(side="right", fill="both", expand=True)
 
         columnas = ("Nombre", "Tipo", "Tamaño", "Fecha modificación")
@@ -208,11 +236,11 @@ class ExploradorAdmin:
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("Treeview",
-                        background="#1e1e1e", foreground="#d4d4d4",
-                        rowheight=25, fieldbackground="#1e1e1e",
+                        background="#f0f0f0", foreground="#222222",
+                        rowheight=25, fieldbackground="#f0f0f0",
                         font=('Segoe UI', 10))
         style.configure("Treeview.Heading",
-                        background="#333333", foreground="white",
+                        background="#dddddd", foreground="#000000",
                         font=('Segoe UI', 10, 'bold'))
         style.map("Treeview",
                   background=[('selected', '#44475a')],
@@ -233,10 +261,10 @@ class ExploradorAdmin:
         ruta = Path(partes[0])
         for parte in partes[1:]:
             ruta = ruta / parte
-            b = tk.Button(self.ruta_label, text=parte, relief="flat", bg="#2d2d2d", fg="white",
+            b = tk.Button(self.ruta_label, text=parte, relief="flat", bg="#e8e8e8", fg="#000000",
                           command=lambda p=ruta: self._navegar_a(p))
             b.pack(side="left")
-            tk.Label(self.ruta_label, text=">", bg="#2d2d2d", fg="#aaa").pack(side="left")
+            tk.Label(self.ruta_label, text=">", bg="#e8e8e8", fg="#aaa").pack(side="left")
 
     def _navegar_historial(self, direccion):
         nueva_pos = self.historial_pos + direccion
@@ -245,6 +273,13 @@ class ExploradorAdmin:
             self._navegar_a(self.historial[self.historial_pos], agregar_historial=False)
 
     def _navegar_a(self, ruta: Path, agregar_historial=True):
+        try:
+            if not ruta.resolve().is_relative_to(self.BASE_DIR.resolve()):
+                messagebox.showwarning("Acceso denegado", "No puedes salir del directorio compartido.")
+                return
+        except Exception:
+            messagebox.showerror("Error", "Ruta inválida o acceso denegado.")
+            return
         self.ruta_actual = ruta
         self._actualizar_barra_ruta(ruta)
         self._actualizar_tabla(ruta)
@@ -446,7 +481,7 @@ class ExploradorAdmin:
 
                 archivo_id = _buscar_archivo_id(nombre_original, ruta_relativa)
                 if archivo_id:
-                    registrar_log(self.es_admin, archivo_id, tipo, motivo_log, nombre_original)
+                    registrar_log(self.user_id, archivo_id, tipo, motivo_log, nombre_original)
                     actualizar_nombre_archivo(archivo_id, nuevo)
 
             except Exception as e:
@@ -492,7 +527,7 @@ class ExploradorAdmin:
                         tipo = "carpeta_eliminada" if subelemento.is_dir() else "archivo_eliminado"
                         archivo_id = _buscar_archivo_id(nombre_sub, ruta_sub)
                         if archivo_id:
-                            registrar_log(self.es_admin, archivo_id, tipo, "Eliminado dentro de carpeta eliminada", nombre_sub)
+                            registrar_log(self.user_id, archivo_id, tipo, "Eliminado dentro de carpeta eliminada", nombre_sub)
                         if subelemento.is_file():
                             archivos_contados += 1
                         elif subelemento.is_dir():
@@ -514,7 +549,7 @@ class ExploradorAdmin:
             archivo_id = _buscar_archivo_id(nombre_original, ruta_relativa)
             if archivo_id:
                 tipo = "carpeta_eliminada" if es_carpeta else "archivo_eliminado"
-                registrar_log(self.es_admin, archivo_id, tipo, "Elemento eliminado", nombre_original)
+                registrar_log(self.user_id, archivo_id, tipo, "Elemento eliminado", nombre_original)
 
             if es_carpeta:
                 messagebox.showinfo("Eliminación completa", f"🗑 Carpeta eliminada con éxito.\n"
@@ -533,7 +568,7 @@ class ExploradorAdmin:
 
         ventana = tk.Toplevel(self.master)
         ventana.title("Motivo de descarga")
-        ventana.geometry("400x200")
+        centrar_ventana(ventana, 400, 200)
 
         tk.Label(ventana, text="Selecciona el motivo:", font=("Segoe UI", 10, "bold")).pack(pady=5)
         motivo_combo = ttk.Combobox(ventana, values=[
@@ -599,7 +634,7 @@ class ExploradorAdmin:
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo descargar:\n{str(e)}")
 
-        tk.Button(ventana, text="📥 Descargar", command=realizar_descarga, bg="#5FB7B6", fg="white").pack(pady=10)
+        tk.Button(ventana, text="📥 Descargar", command=realizar_descarga, bg="#5FB7B6", fg="#000000").pack(pady=10)
 
 
     def _subir_archivo(self):
@@ -620,9 +655,9 @@ class ExploradorAdmin:
 
                 ruta_relativa = str(self.ruta_actual.relative_to(self.BASE_DIR))
 
-                archivo_id = registrar_archivo(nombre_archivo, ruta_relativa, self.es_admin, es_carpeta=False)
+                archivo_id = registrar_archivo(nombre_archivo, ruta_relativa, self.user_id, es_carpeta=False)
                 if archivo_id:
-                    registrar_log(self.es_admin, archivo_id, "subido", "Archivo cargado al sistema", nombre_archivo)
+                    registrar_log(self.user_id, archivo_id, "subido", "Archivo cargado al sistema", nombre_archivo)
 
                 self._actualizar_tabla(self.ruta_actual)
 
@@ -637,10 +672,10 @@ class ExploradorAdmin:
                 nueva.mkdir(exist_ok=False)
 
                 ruta_relativa = str(donde.relative_to(self.BASE_DIR))
-                archivo_id = registrar_archivo(nombre, ruta_relativa, self.es_admin, es_carpeta=True)
+                archivo_id = registrar_archivo(nombre, ruta_relativa, self.user_id, es_carpeta=True)
 
                 if archivo_id:
-                    registrar_log(self.es_admin, archivo_id, "carpeta_creada", "Carpeta creada manualmente", nombre)
+                    registrar_log(self.user_id, archivo_id, "carpeta_creada", "Carpeta creada manualmente", nombre)
 
                 self._actualizar_tabla(self.ruta_actual)
                 self.arbol.delete(*self.arbol.get_children())
@@ -669,7 +704,7 @@ class ExploradorAdmin:
     def _mover_a(self, ruta_origen):
         ventana = tk.Toplevel(self.master)
         ventana.title("Seleccionar carpeta destino")
-        ventana.geometry("300x400")
+        centrar_ventana(ventana, 300, 400)
 
         arbol_destino = ttk.Treeview(ventana)
         arbol_destino.pack(fill="both", expand=True, padx=10, pady=10)
@@ -707,14 +742,13 @@ class ExploradorAdmin:
 
                 shutil.move(str(ruta_origen), str(nuevo_ruta))
 
-                from db.archivos import _buscar_archivo_id, actualizar_ruta_archivo, registrar_log
                 ruta_anterior = str(ruta_origen.parent.relative_to(self.BASE_DIR))
                 ruta_nueva = str(carpeta_destino.relative_to(self.BASE_DIR))
                 archivo_id = _buscar_archivo_id(ruta_origen.name, ruta_anterior)
 
                 if archivo_id:
                     actualizar_ruta_archivo(archivo_id, ruta_nueva)
-                    registrar_log(self.es_admin, archivo_id, "movido",
+                    registrar_log(self.user_id, archivo_id, "movido",
                                 f"Movido de '{ruta_anterior}' a '{ruta_nueva}'", ruta_origen.name)
 
                 self._actualizar_tabla(self.ruta_actual)
@@ -733,6 +767,8 @@ if __name__ == "__main__":
 
 def abrir_menu_admin(user_id, username, modo_oscuro):
     root = TkinterDnD.Tk()
+    root.geometry("1200x700")
+    centrar_ventana(root, 1200, 700)
     app = ExploradorAdmin(root, modo_oscuro=modo_oscuro, es_admin=True)
     app.user_id = user_id
     root.mainloop()

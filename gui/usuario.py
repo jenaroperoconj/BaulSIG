@@ -7,6 +7,8 @@ from tkinter import ttk, filedialog, simpledialog, messagebox
 from db.archivos import registrar_archivo, registrar_log, _buscar_archivo_id, actualizar_nombre_archivo, actualizar_ruta_archivo
 from gui.login import iniciar_login
 from tkinterdnd2 import DND_FILES, TkinterDnD
+from core.utils import centrar_ventana
+from core.config import ARCHIVOS_COMPARTIDOS_DIR
 
 if __name__ == "__main__":
     from gui.login import iniciar_login
@@ -14,6 +16,8 @@ if __name__ == "__main__":
 
 def abrir_menu_usuario(user_id, username, modo_oscuro):
     root = TkinterDnD.Tk()
+    root.geometry("1200x700")
+    centrar_ventana(root, 1200, 700)
     app = ExploradorAdmin(root, modo_oscuro=modo_oscuro, es_admin=False)
     app.user_id = user_id
     root.mainloop()
@@ -27,12 +31,11 @@ class ExploradorAdmin:
         self.master = master
         self.modo_oscuro = modo_oscuro
         self.master.title("Explorador de Archivos - Administrador")
-        self.master.geometry("1200x700")
-        self.master.configure(bg="#1e1e1e")
+        self.master.configure(bg="#f0f0f0")
 
         self.historial = []
         self.historial_pos = -1
-        self.BASE_DIR = Path("uploads")
+        self.BASE_DIR = Path(ARCHIVOS_COMPARTIDOS_DIR)
         self.ruta_actual = self.BASE_DIR
 
         if not self.BASE_DIR.exists():
@@ -54,20 +57,20 @@ class ExploradorAdmin:
         return texto
     
     def _crear_widgets(self):
-        barra_sup = tk.Frame(self.master, bg="#333333", padx=12, pady=10, bd=2, relief="groove")
+        barra_sup = tk.Frame(self.master, bg="#dddddd", padx=12, pady=10, bd=2, relief="groove")
         btn_mis_solicitudes = tk.Button(barra_sup, text="📄 Mis solicitudes", command=self._mostrar_mis_solicitudes)
         btn_mis_solicitudes.pack(side="left", padx=(0, 10))
         # Contenedor para búsqueda y cerrar sesión
-        panel_derecho = tk.Frame(barra_sup, bg="#333333")
+        panel_derecho = tk.Frame(barra_sup, bg="#dddddd")
         panel_derecho.pack(side="right")
 
         # Botón cerrar sesión
         btn_logout = tk.Button(panel_derecho, text="🔒 Cerrar sesión", command=self._cerrar_sesion,
-                            bg="#aa3333", fg="white", font=("Segoe UI", 9, "bold"))
+                            bg="#aa3333", fg="#000000", font=("Segoe UI", 9, "bold"))
         btn_logout.pack(side="right", padx=(5, 0))
 
         # Lupa y entrada de búsqueda
-        label_lupa = tk.Label(panel_derecho, text="🔍", bg="#333333", fg="white", font=("Segoe UI", 10))
+        label_lupa = tk.Label(panel_derecho, text="🔍", bg="#dddddd", fg="#000000", font=("Segoe UI", 10))
         label_lupa.pack(side="left", padx=(0, 0), pady=2)
 
         self.entrada_busqueda = tk.Entry(panel_derecho, width=25)
@@ -81,23 +84,23 @@ class ExploradorAdmin:
         tk.Button(barra_sup, text="←", command=lambda: self._navegar_historial(-1)).pack(side="left")
         tk.Button(barra_sup, text="→", command=lambda: self._navegar_historial(1)).pack(side="left")
 
-        self.ruta_label = tk.Frame(barra_sup, bg="#2d2d2d")
+        self.ruta_label = tk.Frame(barra_sup, bg="#e8e8e8")
         self.ruta_label.pack(side="left", padx=10)
 
         contenedor = tk.Frame(self.master)
         contenedor.pack(fill="both", expand=True)
 
-        self.panel_izq = tk.Frame(contenedor, width=300, bg="#1e1e1e")
+        self.panel_izq = tk.Frame(contenedor, width=300, bg="#f0f0f0")
         self.panel_izq.pack(side="left", fill="y")
 
         # Encabezado para el árbol
-        tk.Label(self.panel_izq, text="📂 Directorio de Carpetas", bg="#1e1e1e", fg="#d4d4d4",
+        tk.Label(self.panel_izq, text="📂 Directorio de Carpetas", bg="#f0f0f0", fg="#222222",
                  font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", padx=5, pady=(5, 0))
 
         self.arbol = ttk.Treeview(self.panel_izq)
         self.arbol.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
-        self.panel_der = tk.Frame(contenedor, bg="#1e1e1e")
+        self.panel_der = tk.Frame(contenedor, bg="#f0f0f0")
         self.panel_der.pack(side="right", fill="both", expand=True)
 
         columnas = ("Nombre", "Tipo", "Tamaño", "Fecha modificación")
@@ -119,7 +122,7 @@ class ExploradorAdmin:
         import psycopg2
         ventana = tk.Toplevel(self.master)
         ventana.title("Mis solicitudes de descarga")
-        ventana.geometry("900x400")
+        centrar_ventana(ventana, 1350, 520)
 
         columnas = ("Archivo", "Motivo", "Estado", "Fecha solicitud", "Acción")
         tabla = ttk.Treeview(ventana, columns=columnas, show="headings", height=18)
@@ -158,46 +161,65 @@ class ExploradorAdmin:
 
             valores = tabla.item(item_id)["values"]
             motivo_actual = valores[1]
+            tipo_actual, _, *detalle_split = motivo_actual.partition(":")
+            detalle_actual = detalle_split[0].strip() if detalle_split else ""
 
             nueva_ventana = tk.Toplevel(ventana)
             nueva_ventana.title("Modificar motivo")
-            nueva_ventana.geometry("400x200")
+            centrar_ventana(nueva_ventana, 400, 300)
 
-            tk.Label(nueva_ventana, text="Motivo actual:", font=("Segoe UI", 10, "bold")).pack(pady=5)
-            tk.Label(nueva_ventana, text=motivo_actual, wraplength=380, fg="gray").pack(pady=2)
+            nueva_ventana.transient(ventana)
+            nueva_ventana.grab_set()
+            nueva_ventana.focus()
 
-            tk.Label(nueva_ventana, text="Nuevo motivo:", font=("Segoe UI", 10, "bold")).pack(pady=5)
+            tk.Label(nueva_ventana, text="Tipo de motivo:", font=("Segoe UI", 10, "bold")).pack(pady=5)
+            motivo_combo = ttk.Combobox(nueva_ventana, values=[
+                "Solicitud", "Trabajo interno", "Modificación de datos", "Otro motivo"
+            ], state="readonly")
+            motivo_combo.set(tipo_actual)
+            motivo_combo.pack(pady=5)
+
+            tk.Label(nueva_ventana, text="Detalle:", font=("Segoe UI", 10, "bold")).pack(pady=5)
             entry = tk.Entry(nueva_ventana, width=40)
+            entry.insert(0, detalle_actual)
             entry.pack(pady=5)
 
             def guardar_motivo():
-                nuevo_motivo = entry.get().strip()
-                if not nuevo_motivo:
-                    messagebox.showerror("Error", "Debes ingresar un nuevo motivo.")
+                tipo = motivo_combo.get().strip()
+                detalle = entry.get().strip()
+                if not tipo or not detalle:
+                    messagebox.showerror("Error", "Debes seleccionar un motivo e ingresar el detalle.")
                     return
+
+                nuevo_motivo = f"{tipo}: {detalle}"
 
                 try:
                     conn = psycopg2.connect(dbname="sistema_archivos", user="postgres", password="sig2025", host="localhost", port="5433")
                     cur = conn.cursor()
-                    # Guardar motivo anterior en historial
+
+                    # Guardar historial
                     cur.execute("""
                         INSERT INTO historial_motivos (solicitud_id, motivo, fecha)
                         SELECT id, motivo, NOW() FROM solicitudes_descarga WHERE id = %s
                     """, (item_id,))
-                    # Actualizar nuevo motivo
+                    
+                    # Actualizar motivo nuevo
                     cur.execute("""
                         UPDATE solicitudes_descarga SET motivo = %s WHERE id = %s
                     """, (nuevo_motivo, item_id))
+
                     conn.commit()
                     conn.close()
 
-                    messagebox.showinfo("Éxito", "Motivo actualizado.")
+                    messagebox.showinfo("Éxito", "Motivo actualizado correctamente.", parent=nueva_ventana)
                     nueva_ventana.destroy()
                     cargar()
                 except Exception as e:
                     messagebox.showerror("Error", f"No se pudo modificar el motivo:\n{str(e)}")
 
-            tk.Button(nueva_ventana, text="Guardar", command=guardar_motivo, bg="#5FB7B6", fg="white").pack(pady=10)
+            tk.Button(nueva_ventana, text="Guardar", command=guardar_motivo, bg="#5FB7B6", fg="#000000").pack(pady=10)
+
+            nueva_ventana.wait_window()
 
         def cargar():
             conn = psycopg2.connect(dbname="sistema_archivos", user="postgres", password="sig2025", host="localhost", port="5433")
@@ -289,11 +311,11 @@ class ExploradorAdmin:
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("Treeview",
-                        background="#1e1e1e", foreground="#d4d4d4",
-                        rowheight=25, fieldbackground="#1e1e1e",
+                        background="#f0f0f0", foreground="#222222",
+                        rowheight=25, fieldbackground="#f0f0f0",
                         font=('Segoe UI', 10))
         style.configure("Treeview.Heading",
-                        background="#333333", foreground="white",
+                        background="#dddddd", foreground="#000000",
                         font=('Segoe UI', 10, 'bold'))
         style.map("Treeview",
                   background=[('selected', '#44475a')],
@@ -314,10 +336,10 @@ class ExploradorAdmin:
         ruta = Path(partes[0])
         for parte in partes[1:]:
             ruta = ruta / parte
-            b = tk.Button(self.ruta_label, text=parte, relief="flat", bg="#2d2d2d", fg="white",
+            b = tk.Button(self.ruta_label, text=parte, relief="flat", bg="#e8e8e8", fg="#000000",
                           command=lambda p=ruta: self._navegar_a(p))
             b.pack(side="left")
-            tk.Label(self.ruta_label, text=">", bg="#2d2d2d", fg="#aaa").pack(side="left")
+            tk.Label(self.ruta_label, text=">", bg="#e8e8e8", fg="#aaa").pack(side="left")
 
     def _navegar_historial(self, direccion):
         nueva_pos = self.historial_pos + direccion
@@ -326,6 +348,13 @@ class ExploradorAdmin:
             self._navegar_a(self.historial[self.historial_pos], agregar_historial=False)
 
     def _navegar_a(self, ruta: Path, agregar_historial=True):
+        try:
+            if not ruta.resolve().is_relative_to(self.BASE_DIR.resolve()):
+                messagebox.showwarning("Acceso denegado", "No puedes salir del directorio compartido.")
+                return
+        except Exception:
+            messagebox.showerror("Error", "Ruta inválida o acceso denegado.")
+            return
         self.ruta_actual = ruta
         self._actualizar_barra_ruta(ruta)
         self._actualizar_tabla(ruta)
@@ -435,29 +464,26 @@ class ExploradorAdmin:
     # ---------------- Menús Contextuales ----------------
 
     def _menu_contexto_arbol(self, event):
-        item = self.tabla.identify_row(event.y)
+        item = self.arbol.identify_row(event.y)
         menu = tk.Menu(self.master, tearoff=0)
 
         if item:
-            nombre = self.tabla.item(item, "values")[0]
-            if nombre.startswith(("📁", "📄", "🗀", "📶", "❓")):
-                nombre = nombre[2:].strip()
-
-            ruta = self.ruta_actual / nombre
-
-            if ruta.is_file():
-                menu.add_command(label="🔍 Abrir", command=lambda: os.startfile(ruta))
-                menu.add_command(label="✏ Renombrar", command=lambda: self._renombrar(ruta, item, False))
-                menu.add_command(label="📁 Mover a...", command=lambda: self._mover_a(ruta))
-            elif ruta.is_dir():
+            self.arbol.selection_set(item)
+            ruta = self._obtener_ruta_completa(item)
+            if ruta.is_dir():
                 menu.add_command(label="🔍 Abrir", command=lambda: self._navegar_a(ruta))
-                menu.add_command(label="✏ Renombrar", command=lambda: self._renombrar(ruta, item, False))
+                menu.add_command(label="✏ Renombrar", command=lambda: self._renombrar(ruta, item, True))
                 if not any(ruta.iterdir()):
                     menu.add_command(label="🗑 Eliminar", command=lambda: self._eliminar(ruta))
                 menu.add_command(label="📁 Mover a...", command=lambda: self._mover_a(ruta))
         else:
             menu.add_command(label="➕ Nueva carpeta", command=lambda: self._crear_carpeta(self.ruta_actual))
             menu.add_command(label="⬆ Subir archivo", command=self._subir_archivo)
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
 
     def _menu_contexto_tabla(self, event):
@@ -592,7 +618,7 @@ class ExploradorAdmin:
         from psycopg2 import connect
         ventana = tk.Toplevel(self.master)
         ventana.title("Solicitud de descarga")
-        ventana.geometry("400x250")
+        centrar_ventana(ventana, 400, 250)
 
         tk.Label(ventana, text="Selecciona el motivo:", font=("Segoe UI", 10, "bold")).pack(pady=5)
         motivo_combo = ttk.Combobox(ventana, values=[
@@ -659,7 +685,7 @@ class ExploradorAdmin:
             except Exception as e:
                 messagebox.showerror("Error BD", str(e))
 
-        tk.Button(ventana, text="📤 Enviar solicitud", command=enviar, bg="#5FB7B6", fg="white").pack(pady=10)
+        tk.Button(ventana, text="📤 Enviar solicitud", command=enviar, bg="#5FB7B6", fg="#000000").pack(pady=10)
 
     def _subir_archivo(self):
         archivo = filedialog.askopenfilename()
@@ -731,7 +757,7 @@ class ExploradorAdmin:
     def _mover_a(self, ruta_origen):
         ventana = tk.Toplevel(self.master)
         ventana.title("Seleccionar carpeta destino")
-        ventana.geometry("300x400")
+        centrar_ventana(ventana, 300, 400)
 
         arbol_destino = ttk.Treeview(ventana)
         arbol_destino.pack(fill="both", expand=True, padx=10, pady=10)
@@ -769,9 +795,6 @@ class ExploradorAdmin:
                     return
 
                 shutil.move(str(ruta_origen), str(nuevo_ruta))
-
-                # Base de datos
-                from db.archivos import _buscar_archivo_id, actualizar_ruta_archivo, registrar_log
                 
                 ruta_anterior = str(ruta_origen.parent.relative_to(self.BASE_DIR))
                 ruta_nueva = str(carpeta_destino.relative_to(self.BASE_DIR))

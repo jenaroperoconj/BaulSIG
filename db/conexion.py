@@ -9,7 +9,6 @@ def conectar():
             host="localhost",
             port="5433"
         )
-        print("Conexión exitosa a la base de datos")
         return conn
     except psycopg2.Error as e:
         print("Error al conectar a la base de datos:", e)

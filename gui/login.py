@@ -1,5 +1,5 @@
 import tkinter as tk
-from core.utils import centrar_ventana, aplicar_tema, cambiar_tema
+from core.utils import centrar_ventana
 from core.colores import colores
 from core.auth import verificar_login
 
@@ -7,7 +7,7 @@ modo_oscuro = False  # estado global
 
 def iniciar_login(modo=None):
     global modo_oscuro
-    modo_oscuro = modo if modo is not None else True
+    modo_oscuro = False
     tema = "oscuro" if modo_oscuro else "claro"
 
     ventana = tk.Tk()
@@ -15,18 +15,6 @@ def iniciar_login(modo=None):
     centrar_ventana(ventana, 900, 400)
     ventana.configure(bg=colores[tema]["bg"])
 
-    # Botón para cambiar tema
-    btn_tema = tk.Button(
-        ventana,
-        text="☀️" if modo_oscuro else "🌙",
-        command=lambda: actualizar_tema(ventana, btn_tema),
-        bg=colores[tema]["bg"],
-        fg=colores[tema]["fg"],
-        borderwidth=0,
-        font=("Arial", 12),
-        cursor="hand2"
-    )
-    btn_tema.place(relx=0.95, rely=0.02, anchor="ne")
 
     # Formulario
     frame = tk.Frame(ventana, bg=colores[tema]["bg"])
@@ -53,10 +41,4 @@ def iniciar_login(modo=None):
         command=lambda: verificar_login(entry_usuario.get(), entry_contrasena.get(), ventana, modo_oscuro)
     ).pack(pady=10)
 
-    aplicar_tema(ventana, tema)
     ventana.mainloop()
-
-
-def actualizar_tema(ventana, boton):
-    global modo_oscuro
-    modo_oscuro = cambiar_tema(ventana, boton, modo_oscuro)
