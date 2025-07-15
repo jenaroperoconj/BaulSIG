@@ -2,6 +2,7 @@ import os
 import shutil
 from pathlib import Path
 from datetime import datetime
+import tempfile
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog, messagebox
 from db.file_manager import archivo_manager
@@ -364,12 +365,36 @@ class ExploradorAdmin:
             nombre, ruta_relativa = archivo
             archivo_path = self.BASE_DIR / ruta_relativa / nombre
             
+            # Verificar si es carpeta o archivo
+            if archivo_path.is_dir():
+                # Comprimir la carpeta en un zip temporal
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    zip_name = f"{nombre}.zip"
+                    zip_path = os.path.join(tmpdir, zip_name)
+                    shutil.make_archive(zip_path.replace('.zip',''), 'zip', archivo_path)
+                    destino = filedialog.asksaveasfilename(defaultextension=".zip", initialfile=zip_name)
+                    if destino:
+                        try:
+                            shutil.copy2(zip_path, destino)
+                            conn = conectar()
+                            cur = conn.cursor()
+                            cur.execute("UPDATE solicitudes_descarga SET estado = 'descargado' WHERE id = %s", (item_id,))
+                            conn.commit()
+                            conn.close()
+                            messagebox.showinfo("✅ Descarga completada", "Carpeta comprimida y descargada correctamente.")
+                            cargar()
+                        except Exception as e:
+                            messagebox.showerror("❌ Error", f"No se pudo descargar: {str(e)}")
+                        return
+
             if not archivo_path.exists():
                 messagebox.showerror("❌ Error", "El archivo ya no está disponible.")
                 return
                 
             destino = filedialog.asksaveasfilename(defaultextension="", initialfile=nombre)
             if destino:
+                from pathlib import Path
+                destino = Path(destino)
                 try:
                     shutil.copy2(archivo_path, destino)
                     conn = conectar()
@@ -1129,7 +1154,7 @@ class ExploradorAdmin:
         # Botones con estilo moderno y bien posicionados
         botones_frame = tk.Frame(main_frame, bg="#f8f9fa")
         botones_frame.pack(fill="x", pady=(10, 5))
-        btn_solicitar = tk.Button(botones_frame, text="📤 Enviar Solicitud", bg="#2196F3", fg="white", font=obtener_fuente('boton'), padx=25, pady=8, relief="flat", cursor="hand2")
+        btn_solicitar = tk.Button(botones_frame, text="📤 Enviar Solicitud", bg="#2196F3", fg="white", font=obtener_fuente('boton'), padx=25, pady=8, relief="flat", cursor="hand2", command=procesar_solicitud)
         btn_cancelar = tk.Button(botones_frame, text="❌ Cancelar", command=cancelar, bg="#F44336", fg="white", font=obtener_fuente('boton'), padx=20, pady=8, relief="flat", cursor="hand2")
         btn_solicitar.pack(side="left", padx=(0, 20))
         btn_cancelar.pack(side="left")
